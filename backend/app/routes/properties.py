@@ -1,18 +1,13 @@
-# backend/app/routes/properties.py
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
-from typing import Optional
+from typing import Optional, List
 
 from .. import models, schemas, database
 
-router = APIRouter()
+router = APIRouter(prefix="/properties", tags=["Properties"])
 
 
-# ------------------------
-# Shared filter function
-# ------------------------
 def apply_filters(query, filters: dict):
-    """Reusable filters across properties, snapshots, and analytics."""
     if filters.get("district"):
         query = query.filter(models.PropertySnapshot.district == filters["district"])
     if filters.get("city"):
@@ -35,11 +30,7 @@ def apply_filters(query, filters: dict):
         query = query.filter(models.PropertySnapshot.trespasse == filters["trespasse"])
     return query
 
-
-# ------------------------
-# List all properties
-# ------------------------
-@router.get("/", response_model=list[schemas.PropertyFullOut])
+@router.get("/", response_model=List[schemas.PropertyFullOut])
 def list_properties(
     db: Session = Depends(database.get_db),
     district: Optional[str] = Query(None),
@@ -53,21 +44,13 @@ def list_properties(
     rented: Optional[bool] = Query(None),
     trespasse: Optional[bool] = Query(None),
 ):
-    """
-    Returns a list of properties with their latest snapshot and annotations.
-    """
-
-    # Base query: join properties with snapshots + eager load relationships
     query = (
         db.query(models.Property)
         .options(
             joinedload(models.Property.snapshots),
             joinedload(models.Property.annotations),
         )
-        .join(models.Property.snapshots)
-        .join(models.Snapshot)
     )
-
     filters = {
         "district": district,
         "city": city,
@@ -81,5 +64,4 @@ def list_properties(
         "trespasse": trespasse,
     }
     query = apply_filters(query, filters)
-
     return query.all()

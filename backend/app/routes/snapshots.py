@@ -1,27 +1,18 @@
-# backend/app/routes/snapshots.py
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 import pandas as pd
 import io
+
 from .. import models, database, schemas
 
-router = APIRouter()
+router = APIRouter(prefix="/snapshots", tags=["Snapshots"])
 
 
-# ------------------------
-# List all snapshots
-# ------------------------
 @router.get("/", response_model=list[schemas.SnapshotOut])
 def list_snapshots(db: Session = Depends(database.get_db)):
-    """
-    Return all uploaded snapshots with basic metadata.
-    """
-    return db.query(models.Snapshot).all()
+    return db.query(models.Snapshot).order_by(models.Snapshot.upload_date.desc()).all()
 
 
-# ------------------------
-# Upload new snapshot
-# ------------------------
 @router.post("/upload", response_model=schemas.SnapshotOut)
 async def upload_snapshot(
     file: UploadFile = File(...),
@@ -39,7 +30,6 @@ async def upload_snapshot(
     if df.empty:
         raise HTTPException(status_code=400, detail="Excel file is empty.")
 
-    # Map Excel column names -> backend fields
     column_mapping = {
         "Distrito": "district",
         "Concelho": "city",
@@ -65,28 +55,30 @@ async def upload_snapshot(
 
     df = df.rename(columns=column_mapping)
 
-    # Create snapshot record
+    # Drop columns without mapping (optional)
+    # keep only the needed ones
+    # e.g. df = df[column_mapping.values() + required_cols if needed]
+
     snapshot = models.Snapshot()
     db.add(snapshot)
     db.commit()
     db.refresh(snapshot)
 
     for _, row in df.iterrows():
-        # Ensure property exists
+        # create or fetch property
         prop = db.query(models.Property).filter_by(property_id=str(row.get("property_id"))).first()
         if not prop:
             prop = models.Property(
                 property_id=str(row.get("property_id")),
-                title=row.get("title", "Untitled"),
-                url=row.get("url", None),
-                area=row.get("area", None),
-                typology=row.get("typology", None),
+                title=row.get("title"),
+                url=row.get("url"),
+                area=row.get("area"),
+                typology=row.get("typology"),
             )
             db.add(prop)
             db.commit()
             db.refresh(prop)
 
-        # Add snapshot row
         snap_data = models.PropertySnapshot(
             snapshot_id=snapshot.id,
             property_id=prop.id,
@@ -104,6 +96,8 @@ async def upload_snapshot(
             new_construction=bool(row.get("new_construction", False)),
             rented=bool(row.get("rented", False)),
             trespasse=bool(row.get("trespasse", False)),
+            image_url=row.get("image_url"),
+            video_url=row.get("video_url"),
             raw_json=row.to_json(),
         )
         db.add(snap_data)
@@ -112,16 +106,11 @@ async def upload_snapshot(
     return snapshot
 
 
-# ------------------------
-# Delete a snapshot
-# ------------------------
-@router.delete("/{snapshot_id}")
+@router.delete("/{snapshot_id}", response_model=dict)
 def delete_snapshot(snapshot_id: int, db: Session = Depends(database.get_db)):
     snapshot = db.query(models.Snapshot).filter(models.Snapshot.id == snapshot_id).first()
     if not snapshot:
         raise HTTPException(status_code=404, detail="Snapshot not found")
-
-    # Cascade delete snapshots
     db.query(models.PropertySnapshot).filter(models.PropertySnapshot.snapshot_id == snapshot_id).delete()
     db.delete(snapshot)
     db.commit()

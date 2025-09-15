@@ -1,20 +1,16 @@
-# backend/app/routes/analytics.py
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Optional
+from typing import Optional, List
 
-from .. import models, database
+from .. import models, database, schemas
 from .properties import apply_filters
 
-router = APIRouter()
+router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 
-# ------------------------
-# Average price per m² per month
-# ------------------------
-@router.get("/avg_price_per_m2")
-def avg_price(
+@router.get("/avg_price_per_m2", response_model=List[schemas.SnapshotOut])
+def avg_price_per_m2(
     db: Session = Depends(database.get_db),
     district: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
@@ -27,7 +23,7 @@ def avg_price(
     query = (
         db.query(
             month_expr,
-            func.avg(models.PropertySnapshot.price_per_m2).label("avg_price")
+            func.avg(models.PropertySnapshot.price_per_m2).label("avg_price"),
         )
         .join(models.PropertySnapshot.snapshot)
     )
@@ -39,20 +35,15 @@ def avg_price(
         "typology": typology,
         "agency": agency,
     }
-    query = apply_filters(query, db, filters)
-
+    query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
 
     return [
-        {"month": r.month.strftime("%Y-%m"), "avg_price": float(r.avg_price)}
-        for r in results if r.avg_price is not None
+        {"month": r.month.strftime("%Y-%m"), "avg_price": float(r.avg_price)} for r in results if r.avg_price is not None
     ]
 
 
-# ------------------------
-# Price distribution per month (min, max, median)
-# ------------------------
-@router.get("/price_distribution")
+@router.get("/price_distribution", response_model=List[schemas.SnapshotOut])
 def price_distribution(
     db: Session = Depends(database.get_db),
     district: Optional[str] = Query(None),
@@ -80,8 +71,7 @@ def price_distribution(
         "typology": typology,
         "agency": agency,
     }
-    query = apply_filters(query, db, filters)
-
+    query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
 
     return [
@@ -95,10 +85,7 @@ def price_distribution(
     ]
 
 
-# ------------------------
-# Listings count per month
-# ------------------------
-@router.get("/listings_per_month")
+@router.get("/listings_per_month", response_model=List[dict])
 def listings_per_month(
     db: Session = Depends(database.get_db),
     district: Optional[str] = Query(None),
@@ -124,11 +111,9 @@ def listings_per_month(
         "typology": typology,
         "agency": agency,
     }
-    query = apply_filters(query, db, filters)
-
+    query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
 
     return [
-        {"month": r.month.strftime("%Y-%m"), "count": int(r.count)}
-        for r in results
+        {"month": r.month.strftime("%Y-%m"), "count": int(r.count)} for r in results
     ]
