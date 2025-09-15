@@ -130,11 +130,10 @@ class AvgPricePerM2Out(BaseModel):
 
 class PriceDistributionOut(BaseModel):
     month: str
-    min_price: float
-    max_price: float
-    median_price: float
-
+    min: float | None = None
+    median: float | None = None
+    max: float | None = None
 
 class ListingsPerMonthOut(BaseModel):
     month: str
-    listings: int
+    count: int
