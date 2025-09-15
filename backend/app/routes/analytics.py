@@ -15,12 +15,17 @@ def avg_price_per_m2(
     district: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
     zone: Optional[str] = Query(None),
-    typology: Optional[str] = Query(None),
     agency: Optional[str] = Query(None),
+    typology: Optional[List[str]] = Query(None),
+    # ranges and search to align with card list
     min_price: Optional[float] = Query(None),
     max_price: Optional[float] = Query(None),
-    min_ppm2: Optional[float] = Query(None),
-    max_ppm2: Optional[float] = Query(None),
+    min_price_per_m2: Optional[float] = Query(None),
+    max_price_per_m2: Optional[float] = Query(None),
+    min_area: Optional[float] = Query(None),
+    max_area: Optional[float] = Query(None),
+    search_address: Optional[str] = Query(None),
+    search_tags: Optional[str] = Query(None),
 ):
     month_expr = func.date_trunc("month", models.Snapshot.upload_date).label("month")
 
@@ -30,20 +35,32 @@ def avg_price_per_m2(
             func.avg(models.PropertySnapshot.price_per_m2).label("avg_price"),
         )
         .join(models.PropertySnapshot.snapshot)
+        .join(models.PropertySnapshot.property)  # needed for area filter
     )
 
     filters = {
-        "district": district, "city": city, "zone": zone,
-        "typology": typology, "agency": agency,
-        "min_price": min_price, "max_price": max_price,
-        "min_ppm2": min_ppm2, "max_ppm2": max_ppm2,
+        "district": district,
+        "city": city,
+        "zone": zone,
+        "agency": agency,
+        "typology_list": typology,
+        "min_price": min_price,
+        "max_price": max_price,
+        "min_price_per_m2": min_price_per_m2,
+        "max_price_per_m2": max_price_per_m2,
+        "min_area": min_area,
+        "max_area": max_area,
+        "search_address": search_address,
+        "search_tags": search_tags,
     }
-    query = apply_filters(query, filters)
 
+    query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
+
     return [
         {"month": r.month.strftime("%Y-%m"), "avg_price": float(r.avg_price)}
-        for r in results if r.avg_price is not None
+        for r in results
+        if r.avg_price is not None
     ]
 
 
@@ -53,40 +70,55 @@ def price_distribution(
     district: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
     zone: Optional[str] = Query(None),
-    typology: Optional[str] = Query(None),
     agency: Optional[str] = Query(None),
+    typology: Optional[List[str]] = Query(None),
     min_price: Optional[float] = Query(None),
     max_price: Optional[float] = Query(None),
-    min_ppm2: Optional[float] = Query(None),
-    max_ppm2: Optional[float] = Query(None),
+    min_price_per_m2: Optional[float] = Query(None),
+    max_price_per_m2: Optional[float] = Query(None),
+    min_area: Optional[float] = Query(None),
+    max_area: Optional[float] = Query(None),
+    search_address: Optional[str] = Query(None),
+    search_tags: Optional[str] = Query(None),
 ):
     month_expr = func.date_trunc("month", models.Snapshot.upload_date).label("month")
 
     query = (
         db.query(
             month_expr,
-            func.min(models.PropertySnapshot.price_per_m2).label("min"),
-            func.max(models.PropertySnapshot.price_per_m2).label("max"),
-            func.percentile_cont(0.5).within_group(models.PropertySnapshot.price_per_m2).label("median"),
+            func.min(models.PropertySnapshot.price_per_m2).label("min_price"),
+            func.max(models.PropertySnapshot.price_per_m2).label("max_price"),
+            func.percentile_cont(0.5).within_group(models.PropertySnapshot.price_per_m2).label("median_price"),
         )
         .join(models.PropertySnapshot.snapshot)
+        .join(models.PropertySnapshot.property)
     )
 
     filters = {
-        "district": district, "city": city, "zone": zone,
-        "typology": typology, "agency": agency,
-        "min_price": min_price, "max_price": max_price,
-        "min_ppm2": min_ppm2, "max_ppm2": max_ppm2,
+        "district": district,
+        "city": city,
+        "zone": zone,
+        "agency": agency,
+        "typology_list": typology,
+        "min_price": min_price,
+        "max_price": max_price,
+        "min_price_per_m2": min_price_per_m2,
+        "max_price_per_m2": max_price_per_m2,
+        "min_area": min_area,
+        "max_area": max_area,
+        "search_address": search_address,
+        "search_tags": search_tags,
     }
-    query = apply_filters(query, filters)
 
+    query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
+
     return [
         {
             "month": r.month.strftime("%Y-%m"),
-            "min": float(r.min) if r.min is not None else None,
-            "median": float(r.median) if r.median is not None else None,
-            "max": float(r.max) if r.max is not None else None,
+            "min_price": float(r.min_price) if r.min_price is not None else None,
+            "max_price": float(r.max_price) if r.max_price is not None else None,
+            "median_price": float(r.median_price) if r.median_price is not None else None,
         }
         for r in results
     ]
@@ -98,12 +130,16 @@ def listings_per_month(
     district: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
     zone: Optional[str] = Query(None),
-    typology: Optional[str] = Query(None),
     agency: Optional[str] = Query(None),
+    typology: Optional[List[str]] = Query(None),
     min_price: Optional[float] = Query(None),
     max_price: Optional[float] = Query(None),
-    min_ppm2: Optional[float] = Query(None),
-    max_ppm2: Optional[float] = Query(None),
+    min_price_per_m2: Optional[float] = Query(None),
+    max_price_per_m2: Optional[float] = Query(None),
+    min_area: Optional[float] = Query(None),
+    max_area: Optional[float] = Query(None),
+    search_address: Optional[str] = Query(None),
+    search_tags: Optional[str] = Query(None),
 ):
     month_expr = func.date_trunc("month", models.Snapshot.upload_date).label("month")
 
@@ -113,15 +149,26 @@ def listings_per_month(
             func.count(models.PropertySnapshot.id).label("count"),
         )
         .join(models.PropertySnapshot.snapshot)
+        .join(models.PropertySnapshot.property)
     )
 
     filters = {
-        "district": district, "city": city, "zone": zone,
-        "typology": typology, "agency": agency,
-        "min_price": min_price, "max_price": max_price,
-        "min_ppm2": min_ppm2, "max_ppm2": max_ppm2,
+        "district": district,
+        "city": city,
+        "zone": zone,
+        "agency": agency,
+        "typology_list": typology,
+        "min_price": min_price,
+        "max_price": max_price,
+        "min_price_per_m2": min_price_per_m2,
+        "max_price_per_m2": max_price_per_m2,
+        "min_area": min_area,
+        "max_area": max_area,
+        "search_address": search_address,
+        "search_tags": search_tags,
     }
-    query = apply_filters(query, filters)
 
+    query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
-    return [{"month": r.month.strftime("%Y-%m"), "count": int(r.count)} for r in results]
+
+    return [{"month": r.month.strftime("%Y-%m"), "listings": int(r.count)} for r in results]

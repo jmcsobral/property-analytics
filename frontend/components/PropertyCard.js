@@ -1,85 +1,80 @@
-import { useState } from "react";
-import api from "../lib/api";
-
 export default function PropertyCard({ property }) {
-  // load first annotation if exists, otherwise empty
-  const [annotations, setAnnotations] = useState(
-    property.annotations && property.annotations.length > 0
-      ? property.annotations[0]
-      : { reviewed: false, interesting: "maybe", contacted: false, notes: "" }
-  );
+  // pick the latest snapshot by highest snapshot_id
+  const snapshots = Array.isArray(property.snapshots) ? property.snapshots : [];
+  const latestSnap = snapshots.reduce((best, cur) => {
+    if (!best) return cur;
+    return (cur.snapshot_id || 0) > (best.snapshot_id || 0) ? cur : best;
+  }, null);
 
-  // Save annotation immediately when changed
-  const updateAnnotation = async (field, value) => {
-    const updated = { ...annotations, [field]: value };
-    setAnnotations(updated);
-    try {
-      const res = await api.post(`/annotations/${property.id}`, updated);
-      setAnnotations(res.data); // keep backend state
-    } catch (err) {
-      console.error("Error saving annotation:", err);
-    }
-  };
+  const title = property.title || latestSnap?.address || "Untitled";
+  const url = property.url || "#";
+
+  const imgUrl =
+    latestSnap?.image_url && typeof latestSnap.image_url === "string" && latestSnap.image_url.trim().length
+      ? latestSnap.image_url
+      : "https://via.placeholder.com/320x200?text=No+Image";
+
+  const price = latestSnap?.price;
+  const ppm2 = latestSnap?.price_per_m2;
+  const area = property.area;
+  const typology = latestSnap?.typology || property.typology;
+  const agency = latestSnap?.agency;
+
+  const district = latestSnap?.district;
+  const city = latestSnap?.city;
+  const zone = latestSnap?.zone;
+
+  const fmt = new Intl.NumberFormat("en-PT", { maximumFractionDigits: 0 });
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 flex space-x-4">
-      <a href={property.url} target="_blank" rel="noreferrer">
+    <div className="bg-white rounded-lg shadow p-4 flex gap-4">
+      <div className="w-40 h-28 flex-none overflow-hidden rounded-md bg-gray-100">
+        {/* plain <img> to avoid Next.js domain config hassles */}
         <img
-          src={property.image_url || "https://via.placeholder.com/150"}
-          alt=""
-          className="w-32 h-24 object-cover rounded hover:opacity-80 transition"
+          src={imgUrl}
+          alt={title}
+          className="w-full h-full object-cover object-center"
+          loading="lazy"
         />
-      </a>
+      </div>
+
       <div className="flex-1">
-        <h3 className="font-semibold text-lg">{property.title}</h3>
-        <p className="text-sm text-gray-500">
-          {property.area} m² •{" "}
-          {property.snapshots?.[0]?.price_per_m2 || "-"} €/m²
-        </p>
-        <p className="font-bold text-blue-600">
-          {property.snapshots?.[0]?.price || "-"} €
-        </p>
-
-        {/* Annotation controls */}
-        <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={annotations.reviewed || false}
-              onChange={(e) => updateAnnotation("reviewed", e.target.checked)}
-            />
-            <span>Reviewed</span>
-          </label>
-
-          <label className="flex items-center space-x-2">
-            <span>Interesting:</span>
-            <select
-              className="border rounded p-1"
-              value={annotations.interesting || "maybe"}
-              onChange={(e) => updateAnnotation("interesting", e.target.value)}
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-              <option value="maybe">Maybe</option>
-            </select>
-          </label>
-
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={annotations.contacted || false}
-              onChange={(e) => updateAnnotation("contacted", e.target.checked)}
-            />
-            <span>Contacted</span>
-          </label>
+        <div className="flex items-start justify-between">
+          <a
+            href={url}
+            className="text-base font-semibold hover:underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {title}
+          </a>
+          {agency ? <span className="text-xs bg-gray-100 px-2 py-1 rounded">{agency}</span> : null}
         </div>
 
-        <textarea
-          className="w-full mt-3 border rounded p-2 text-sm"
-          placeholder="Notes..."
-          value={annotations.notes || ""}
-          onChange={(e) => updateAnnotation("notes", e.target.value)}
-        />
+        <div className="text-sm text-gray-600 mt-1">
+          {[district, city, zone].filter(Boolean).join(" • ")}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
+          {typeof price === "number" ? (
+            <div>
+              <span className="font-semibold">€{fmt.format(price)}</span>
+              {typeof ppm2 === "number" ? <span className="text-gray-500"> &nbsp;({fmt.format(ppm2)} €/m²)</span> : null}
+            </div>
+          ) : (
+            <div className="text-gray-500">Price on request</div>
+          )}
+
+          {typeof area === "number" ? (
+            <div className="text-gray-700">{fmt.format(area)} m²</div>
+          ) : null}
+
+          {typology ? <div className="text-gray-700">{typology}</div> : null}
+        </div>
+
+        {latestSnap?.tags ? (
+          <div className="text-xs text-gray-500 mt-2 truncate">Tags: {latestSnap.tags}</div>
+        ) : null}
       </div>
     </div>
   );
