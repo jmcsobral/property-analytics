@@ -8,6 +8,7 @@ router = APIRouter()
 
 
 def apply_filters(query, filters: dict):
+    # categorical filters
     if filters.get("district"):
         query = query.filter(models.PropertySnapshot.district == filters["district"])
     if filters.get("city"):
@@ -19,7 +20,7 @@ def apply_filters(query, filters: dict):
     if filters.get("agency"):
         query = query.filter(models.PropertySnapshot.agency == filters["agency"])
 
-    # Boolean filters
+    # boolean flags
     if filters.get("parking") is not None:
         query = query.filter(models.PropertySnapshot.parking == filters["parking"])
     if filters.get("elevator") is not None:
@@ -31,15 +32,15 @@ def apply_filters(query, filters: dict):
     if filters.get("trespasse") is not None:
         query = query.filter(models.PropertySnapshot.trespasse == filters["trespasse"])
 
-    # Numeric filters
+    # numeric ranges — price & price_per_m2
     if filters.get("min_price") is not None:
         query = query.filter(models.PropertySnapshot.price >= filters["min_price"])
     if filters.get("max_price") is not None:
         query = query.filter(models.PropertySnapshot.price <= filters["max_price"])
-    if filters.get("min_price_per_m2") is not None:
-        query = query.filter(models.PropertySnapshot.price_per_m2 >= filters["min_price_per_m2"])
-    if filters.get("max_price_per_m2") is not None:
-        query = query.filter(models.PropertySnapshot.price_per_m2 <= filters["max_price_per_m2"])
+    if filters.get("min_ppm2") is not None:
+        query = query.filter(models.PropertySnapshot.price_per_m2 >= filters["min_ppm2"])
+    if filters.get("max_ppm2") is not None:
+        query = query.filter(models.PropertySnapshot.price_per_m2 <= filters["max_ppm2"])
 
     return query
 
@@ -59,8 +60,8 @@ def list_properties(
     trespasse: Optional[bool] = Query(None),
     min_price: Optional[float] = Query(None),
     max_price: Optional[float] = Query(None),
-    min_price_per_m2: Optional[float] = Query(None),
-    max_price_per_m2: Optional[float] = Query(None),
+    min_ppm2: Optional[float] = Query(None),
+    max_ppm2: Optional[float] = Query(None),
 ):
     query = (
         db.query(models.Property)
@@ -68,6 +69,8 @@ def list_properties(
             joinedload(models.Property.snapshots),
             joinedload(models.Property.annotations),
         )
+        # ensure we have at least one snapshot row to filter on
+        .join(models.Property.snapshots)
     )
 
     filters = {
@@ -83,8 +86,8 @@ def list_properties(
         "trespasse": trespasse,
         "min_price": min_price,
         "max_price": max_price,
-        "min_price_per_m2": min_price_per_m2,
-        "max_price_per_m2": max_price_per_m2,
+        "min_ppm2": min_ppm2,
+        "max_ppm2": max_ppm2,
     }
     query = apply_filters(query, filters)
     return query.all()
