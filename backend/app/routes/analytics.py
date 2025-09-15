@@ -6,10 +6,13 @@ from typing import Optional, List
 from .. import models, database, schemas
 from .properties import apply_filters
 
-router = APIRouter(prefix="/analytics", tags=["Analytics"])
+router = APIRouter()
 
 
-@router.get("/avg_price_per_m2", response_model=List[schemas.SnapshotOut])
+# ------------------------
+# Average price per m²
+# ------------------------
+@router.get("/avg_price_per_m2", response_model=List[schemas.AvgPricePerM2Out])
 def avg_price_per_m2(
     db: Session = Depends(database.get_db),
     district: Optional[str] = Query(None),
@@ -17,6 +20,10 @@ def avg_price_per_m2(
     zone: Optional[str] = Query(None),
     typology: Optional[str] = Query(None),
     agency: Optional[str] = Query(None),
+    min_price: Optional[float] = Query(None),
+    max_price: Optional[float] = Query(None),
+    min_price_per_m2: Optional[float] = Query(None),
+    max_price_per_m2: Optional[float] = Query(None),
 ):
     month_expr = func.date_trunc("month", models.Snapshot.upload_date).label("month")
 
@@ -34,16 +41,24 @@ def avg_price_per_m2(
         "zone": zone,
         "typology": typology,
         "agency": agency,
+        "min_price": min_price,
+        "max_price": max_price,
+        "min_price_per_m2": min_price_per_m2,
+        "max_price_per_m2": max_price_per_m2,
     }
     query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
 
     return [
-        {"month": r.month.strftime("%Y-%m"), "avg_price": float(r.avg_price)} for r in results if r.avg_price is not None
+        {"month": r.month.strftime("%Y-%m"), "avg_price": float(r.avg_price)}
+        for r in results if r.avg_price is not None
     ]
 
 
-@router.get("/price_distribution", response_model=List[schemas.SnapshotOut])
+# ------------------------
+# Price distribution
+# ------------------------
+@router.get("/price_distribution", response_model=List[schemas.PriceDistributionOut])
 def price_distribution(
     db: Session = Depends(database.get_db),
     district: Optional[str] = Query(None),
@@ -51,6 +66,10 @@ def price_distribution(
     zone: Optional[str] = Query(None),
     typology: Optional[str] = Query(None),
     agency: Optional[str] = Query(None),
+    min_price: Optional[float] = Query(None),
+    max_price: Optional[float] = Query(None),
+    min_price_per_m2: Optional[float] = Query(None),
+    max_price_per_m2: Optional[float] = Query(None),
 ):
     month_expr = func.date_trunc("month", models.Snapshot.upload_date).label("month")
 
@@ -70,6 +89,10 @@ def price_distribution(
         "zone": zone,
         "typology": typology,
         "agency": agency,
+        "min_price": min_price,
+        "max_price": max_price,
+        "min_price_per_m2": min_price_per_m2,
+        "max_price_per_m2": max_price_per_m2,
     }
     query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
@@ -85,7 +108,10 @@ def price_distribution(
     ]
 
 
-@router.get("/listings_per_month", response_model=List[dict])
+# ------------------------
+# Listings per month
+# ------------------------
+@router.get("/listings_per_month", response_model=List[schemas.ListingsPerMonthOut])
 def listings_per_month(
     db: Session = Depends(database.get_db),
     district: Optional[str] = Query(None),
@@ -93,6 +119,10 @@ def listings_per_month(
     zone: Optional[str] = Query(None),
     typology: Optional[str] = Query(None),
     agency: Optional[str] = Query(None),
+    min_price: Optional[float] = Query(None),
+    max_price: Optional[float] = Query(None),
+    min_price_per_m2: Optional[float] = Query(None),
+    max_price_per_m2: Optional[float] = Query(None),
 ):
     month_expr = func.date_trunc("month", models.Snapshot.upload_date).label("month")
 
@@ -110,10 +140,15 @@ def listings_per_month(
         "zone": zone,
         "typology": typology,
         "agency": agency,
+        "min_price": min_price,
+        "max_price": max_price,
+        "min_price_per_m2": min_price_per_m2,
+        "max_price_per_m2": max_price_per_m2,
     }
     query = apply_filters(query, filters)
     results = query.group_by(month_expr).order_by(month_expr).all()
 
     return [
-        {"month": r.month.strftime("%Y-%m"), "count": int(r.count)} for r in results
+        {"month": r.month.strftime("%Y-%m"), "listings": int(r.count)}
+        for r in results
     ]

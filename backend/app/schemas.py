@@ -1,7 +1,12 @@
+# backend/app/schemas.py
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
 
+
+# ------------------------
+# Annotations
+# ------------------------
 class AnnotationBase(BaseModel):
     reviewed: Optional[bool] = None
     contacted: Optional[bool] = None
@@ -10,8 +15,10 @@ class AnnotationBase(BaseModel):
     class Config:
         from_attributes = True
 
+
 class AnnotationCreate(AnnotationBase):
     property_id: int
+
 
 class AnnotationOut(AnnotationBase):
     id: int
@@ -20,6 +27,10 @@ class AnnotationOut(AnnotationBase):
     class Config:
         from_attributes = True
 
+
+# ------------------------
+# Properties
+# ------------------------
 class PropertyBase(BaseModel):
     property_id: str
     title: Optional[str] = None
@@ -30,6 +41,7 @@ class PropertyBase(BaseModel):
     class Config:
         from_attributes = True
 
+
 class PropertyOut(PropertyBase):
     id: int
     created_at: datetime
@@ -37,6 +49,10 @@ class PropertyOut(PropertyBase):
     class Config:
         from_attributes = True
 
+
+# ------------------------
+# Property Snapshots
+# ------------------------
 class PropertySnapshotBase(BaseModel):
     price: Optional[float] = None
     price_per_m2: Optional[float] = None
@@ -63,6 +79,7 @@ class PropertySnapshotBase(BaseModel):
     class Config:
         from_attributes = True
 
+
 class PropertySnapshotOut(PropertySnapshotBase):
     id: int
     property_id: int
@@ -71,6 +88,10 @@ class PropertySnapshotOut(PropertySnapshotBase):
     class Config:
         from_attributes = True
 
+
+# ------------------------
+# Snapshots
+# ------------------------
 class SnapshotBase(BaseModel):
     id: int
     upload_date: datetime
@@ -78,16 +99,42 @@ class SnapshotBase(BaseModel):
     class Config:
         from_attributes = True
 
+
 class SnapshotCreate(BaseModel):
     pass
+
 
 class SnapshotOut(SnapshotBase):
     class Config:
         from_attributes = True
 
+
+# ------------------------
+# Combined Property + Snapshot + Annotations
+# ------------------------
 class PropertyFullOut(PropertyOut):
     snapshots: List[PropertySnapshotOut] = []
     annotations: List[AnnotationOut] = []
 
     class Config:
         from_attributes = True
+
+
+# ------------------------
+# Analytics
+# ------------------------
+class AvgPricePerM2Out(BaseModel):
+    month: str
+    avg_price: float
+
+
+class PriceDistributionOut(BaseModel):
+    month: str
+    min_price: float
+    max_price: float
+    median_price: float
+
+
+class ListingsPerMonthOut(BaseModel):
+    month: str
+    listings: int

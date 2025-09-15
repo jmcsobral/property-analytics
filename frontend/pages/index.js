@@ -20,33 +20,34 @@ export default function Home() {
     return params.toString();
   };
 
-  const loadData = async (activeFilters = {}) => {
-    try {
-      const query = buildQuery(activeFilters);
-      const res = await api.get(`/properties/?${query}`);
-      setProperties(res.data);
+const loadData = async (activeFilters = {}) => {
+  try {
+    const query = buildQuery(activeFilters);
+    const res = await api.get(`/properties/?${query}`);
+    setProperties(res.data);
 
-      const [avg, dist, count] = await Promise.all([
-        api.get(`/analytics/avg_price_per_m2?${query}`),
-        api.get(`/analytics/price_distribution?${query}`),
-        api.get(`/analytics/listings_per_month?${query}`),
-      ]);
+    const [avg, dist, listings] = await Promise.all([
+      api.get(`/analytics/avg_price_per_m2?${query}`),
+      api.get(`/analytics/price_distribution?${query}`),
+      api.get(`/analytics/listings_per_month?${query}`),
+    ]);
 
-      const merged = {};
-      avg.data.forEach((r) => {
-        merged[r.month] = { month: r.month, avg_price: r.avg_price };
-      });
-      dist.data.forEach((r) => {
-        merged[r.month] = { ...merged[r.month], ...r };
-      });
-      count.data.forEach((r) => {
-        merged[r.month] = { ...merged[r.month], count: r.count };
-      });
-      setChartData(Object.values(merged));
-    } catch (err) {
-      console.error("Error loading data:", err);
-    }
-  };
+    const merged = {};
+    avg.data.forEach((r) => {
+      merged[r.month] = { month: r.month, avg_price: r.avg_price };
+    });
+    dist.data.forEach((r) => {
+      merged[r.month] = { ...merged[r.month], ...r }; // already has min_price, max_price, median_price
+    });
+    listings.data.forEach((r) => {
+      merged[r.month] = { ...merged[r.month], listings: r.listings }; // ✅ use listings, not count
+    });
+
+    setChartData(Object.values(merged));
+  } catch (err) {
+    console.error("Error loading data:", err);
+  }
+};
 
   useEffect(() => {
     loadData(filters);

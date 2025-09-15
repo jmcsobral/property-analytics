@@ -1,13 +1,34 @@
+# backend/app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import properties, snapshots, annotations, analytics
-from .database import engine, Base, SessionLocal
-from . import models
+from contextlib import asynccontextmanager
+from app.routes import properties, snapshots, annotations, analytics
+from app.database import engine, Base, SessionLocal
+from app import models
 from datetime import datetime
+from sqlalchemy.orm import Session
 
+
+# Create tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Property Analytics")
+
+# ---- Lifespan handler (replaces deprecated on_event) ----
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("=== Registered Routes at Startup ===")
+    for route in app.routes:
+        print(f"Path: {route.path} | Name: {route.name}")
+
+    yield  # app runs here
+
+    # Shutdown
+    print("Shutting down...")
+
+
+# ---- App ----
+app = FastAPI(title="Property Analytics", lifespan=lifespan)
 
 # CORS setup
 origins = [
@@ -23,14 +44,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
+
+# ---- Routers ----
 app.include_router(properties.router, prefix="/properties", tags=["Properties"])
 app.include_router(snapshots.router, prefix="/snapshots", tags=["Snapshots"])
 app.include_router(annotations.router, prefix="/annotations", tags=["Annotations"])
 app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 
+
 # ---- Auto-seed fake data ----
-from sqlalchemy.orm import Session
 def seed_data():
     db: Session = SessionLocal()
     if db.query(models.Snapshot).count() == 0:
@@ -76,5 +98,6 @@ def seed_data():
 
         db.commit()
     db.close()
+
 
 seed_data()

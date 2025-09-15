@@ -5,7 +5,7 @@ import io
 
 from .. import models, database, schemas
 
-router = APIRouter(prefix="/snapshots", tags=["Snapshots"])
+router = APIRouter()
 
 
 @router.get("/", response_model=list[schemas.SnapshotOut])
